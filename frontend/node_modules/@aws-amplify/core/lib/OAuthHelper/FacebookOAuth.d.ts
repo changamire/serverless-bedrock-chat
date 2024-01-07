@@ -1,0 +1,6 @@
+export declare class FacebookOAuth {
+    initialized: boolean;
+    constructor();
+    refreshFacebookToken(): Promise<unknown>;
+    private _refreshFacebookTokenImpl;
+}

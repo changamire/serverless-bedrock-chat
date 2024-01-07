@@ -1,0 +1,1 @@
+import{createMachine as e}from"xstate";import{Auth as t}from"aws-amplify";const i=e({initial:"pending",id:"signOutActor",predictableActionArguments:!0,states:{pending:{tags:["pending"],invoke:{src:"signOut",onDone:"resolved",onError:"rejected"}},resolved:{type:"final"},rejected:{type:"final"}}},{services:{signOut:()=>t.signOut()}});export{i as signOutActor};

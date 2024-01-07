@@ -1,0 +1,12 @@
+"use strict";
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.expoDetect = void 0;
+var helpers_1 = require("./helpers");
+// Tested with expo 48 / react-native 0.71.3
+function expoDetect() {
+    // @ts-ignore
+    return (0, helpers_1.globalExists)() && typeof global['expo'] !== 'undefined';
+}
+exports.expoDetect = expoDetect;

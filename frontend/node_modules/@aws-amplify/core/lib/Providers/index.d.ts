@@ -1,0 +1,1 @@
+export { AWSCloudWatchProvider } from './AWSCloudWatchProvider';

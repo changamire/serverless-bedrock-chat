@@ -1,0 +1,1 @@
+var o,e;!function(o){o.Apple="SignInWithApple",o.Amazon="LoginWithAmazon",o.Facebook="Facebook",o.Google="Google"}(o||(o={})),function(o){o.Email="email",o.PhoneNumber="phone_number"}(e||(e={}));export{o as FederatedIdentityProviders,e as UnverifiedContactMethodType};

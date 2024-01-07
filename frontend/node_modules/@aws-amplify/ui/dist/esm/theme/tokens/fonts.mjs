@@ -1,0 +1,1 @@
+const e={default:{variable:{value:"'InterVariable', 'Inter var', 'Inter', -apple-system, BlinkMacSystemFont,\n        'Helvetica Neue', 'Segoe UI', Oxygen, Ubuntu, Cantarell, 'Open Sans',\n        sans-serif"},static:{value:"'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue',\n        'Segoe UI', Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif"}}};export{e as fonts};
