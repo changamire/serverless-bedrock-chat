@@ -1,1 +1,0 @@
-const t=t=>{var o;return null===(o=t.context.actorRef)||void 0===o?void 0:o.getSnapshot()},o=o=>{var n;return null===(n=t(o))||void 0===n?void 0:n.context};export{o as getActorContext,t as getActorState};

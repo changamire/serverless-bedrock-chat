@@ -1,1 +1,0 @@
-const e={gap:{value:"{space.xs.value}"},fontSize:{value:"{fontSizes.medium.value}"},flexDirection:{value:"column"},small:{gap:{value:"{space.xxxs.value}"},fontSize:{value:"{fontSizes.small.value}"}},large:{gap:{value:"{space.small.value}"},fontSize:{value:"{fontSizes.large.value}"}},label:{color:{value:"{colors.font.secondary.value}"}}};export{e as field};
