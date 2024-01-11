@@ -1,0 +1,350 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The AWS CloudFormation template to setup the required infrastructure
+
+Parameters:
+  UserEmail:
+    Type: String
+    Description: Email address of user to create
+  BucketName:
+    Type: String
+    Description: Name of the bucket to host your site in
+  DeploymentBucketName:
+    Type: String
+    Description: Name of the bucket holding your API Lambda zip file
+ 
+Resources:
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: user-pool
+      UsernameConfiguration:
+        CaseSensitive: false
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 1
+      UsernameAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      Schema:
+        - AttributeDataType: String
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Name: email
+
+  ClientAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: ClientApp
+      GenerateSecret: false
+      RefreshTokenValidity: 30
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      CallbackURLs:
+        - http://localhost:8080
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+        - aws.cognito.signin.user.admin
+      AllowedOAuthFlowsUserPoolClient: true
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+  TestUser:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      Username: !Ref UserEmail
+      UserAttributes:
+        - Name: email
+          Value: !Ref UserEmail
+
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      AccessControl: Private
+      BucketName: !Ref BucketName
+
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Description: "origin access control(OAC) for allowing cloudfront to access S3 bucket"
+        Name: static-hosting-OAC
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn:
+      - S3Bucket
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !Sub "${BucketName}.s3.${AWS::Region}.amazonaws.com"
+            Id: static-hosting
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+        Enabled: "true"
+        DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        HttpVersion: http2
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: 'true'
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - DELETE
+            - GET
+            - HEAD
+            - OPTIONS
+            - PATCH
+            - POST
+            - PUT
+          Compress: true
+          TargetOriginId: static-hosting
+          ForwardedValues:
+            QueryString: "false"
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BucketName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "cloudfront.amazonaws.com"
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${BucketName}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  APILogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/api'
+  IamRoleLambdaExecution:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Join 
+            - '-'
+            - - api
+              - lambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:TagResource'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub >-
+                    arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/api*
+              - Effect: Allow
+                Action:
+                  - 'bedrock:*'
+                Resource:
+                  - '*'
+              - Effect: Allow
+                Action:
+                  - 'execute-api:ManageConnections'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:execute-api:*:*:*/@connections/*'
+      Path: /
+      RoleName: !Join 
+        - '-'
+        - - api
+          - !Ref 'AWS::Region'
+          - lambdaRole
+  APILambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        S3Bucket: !Sub '${DeploymentBucketName}'
+        S3Key: >-
+          api.zip
+      Handler: src/index.handler
+      Runtime: nodejs18.x
+      FunctionName: api
+      MemorySize: 1024
+      Timeout: 600
+      Environment:
+        Variables:
+          APIGW_ARN: !Sub >-
+            arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketsApi}/dev
+          JWKS_URI: !Sub >-
+            https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}/.well-known/jwks.json
+          ISSUER: !Sub >-
+            https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}
+          AUDIENCE: !Ref ClientAppClient
+          API_GW_ENDPOINT: !Join 
+            - ''
+            - - 'https://'
+              - !Ref WebsocketsApi
+              - .execute-api.
+              - !Ref 'AWS::Region'
+              - .
+              - !Ref 'AWS::URLSuffix'
+              - /dev
+      Role: !GetAtt 
+        - IamRoleLambdaExecution
+        - Arn
+    DependsOn:
+      - APILogGroup
+
+  WebsocketsApi:
+      Type: 'AWS::ApiGatewayV2::Api'
+      Properties:
+        Name: chatbot-websocket-api
+        RouteSelectionExpression: $request.body.action
+        ProtocolType: WEBSOCKET
+  ApplicationWebsocketsIntegration:
+    Type: 'AWS::ApiGatewayV2::Integration'
+    Properties:
+      ApiId: !Ref WebsocketsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Join 
+        - ''
+        - - 'arn:'
+          - !Ref 'AWS::Partition'
+          - ':apigateway:'
+          - !Ref 'AWS::Region'
+          - ':lambda:path/2015-03-31/functions/'
+          - !GetAtt 
+            - APILambdaFunction
+            - Arn
+          - /invocations
+  ApplicationLambdaPermissionWebsockets:
+    Type: 'AWS::Lambda::Permission'
+    DependsOn:
+      - WebsocketsApi
+      - APILambdaFunction
+    Properties:
+      FunctionName: !GetAtt 
+        - APILambdaFunction
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+
+  SconnectWebsocketsRoute:
+    Type: 'AWS::ApiGatewayV2::Route'
+    Properties:
+      ApiId: !Ref WebsocketsApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Join 
+        - /
+        - - integrations
+          - !Ref ApplicationWebsocketsIntegration
+  SdisconnectWebsocketsRoute:
+    Type: 'AWS::ApiGatewayV2::Route'
+    Properties:
+      ApiId: !Ref WebsocketsApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Join 
+        - /
+        - - integrations
+          - !Ref ApplicationWebsocketsIntegration
+  askWebsocketsRoute:
+    Type: 'AWS::ApiGatewayV2::Route'
+    Properties:
+      ApiId: !Ref WebsocketsApi
+      RouteKey: ask
+      AuthorizationType: NONE
+      Target: !Join 
+        - /
+        - - integrations
+          - !Ref ApplicationWebsocketsIntegration
+  SdefaultWebsocketsRoute:
+    Type: 'AWS::ApiGatewayV2::Route'
+    Properties:
+      ApiId: !Ref WebsocketsApi
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Join 
+        - /
+        - - integrations
+          - !Ref ApplicationWebsocketsIntegration
+  WebsocketsDeploymentStage:
+    Type: 'AWS::ApiGatewayV2::Stage'
+    Properties:
+      ApiId: !Ref WebsocketsApi
+      StageName: dev
+      Description: Serverless Websockets
+      DeploymentId: !Ref WebsocketsDeployment
+  WebsocketsDeployment:
+    Type: 'AWS::ApiGatewayV2::Deployment'
+    DependsOn:
+      - SconnectWebsocketsRoute
+      - SdisconnectWebsocketsRoute
+      - askWebsocketsRoute
+      - SdefaultWebsocketsRoute
+    Properties:
+      ApiId: !Ref WebsocketsApi
+
+Outputs:
+  CognitoUserPoolID:
+    Value: !Ref CognitoUserPool
+    Description: The UserPool ID
+  CognitoAppClientID:
+    Value: !Ref ClientAppClient
+    Description: The app client id
+  DomainName:
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Description: The Cloudfront domain your app is hosted at
+  ServiceEndpointWebsocket:
+    Description: WSS URL of the service endpoint
+    Value: !Join 
+      - ''
+      - - 'wss://'
+        - !Ref WebsocketsApi
+        - .execute-api.
+        - !Ref 'AWS::Region'
+        - .
+        - !Ref 'AWS::URLSuffix'
+        - /dev
+    Export:
+      Name: ServiceEndpointWebsocket
