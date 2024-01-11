@@ -13,8 +13,7 @@ build-frontend:
 	cd frontend && npm ci && npm run build
 
 deploy-backend:
-	cd backend/dist && aws s3 cp api.zip s3://api-deployment-8876729
+	cd backend/dist && aws s3 cp api.zip s3://${BE_DEPLOYMENT_BUCKET}
 
 deploy-frontend:
-
-deploy:
+	cd frontend/ && aws s3 cp www s3://${FE_DEPLOYMENT_BUCKET} --recursive
