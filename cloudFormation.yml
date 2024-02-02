@@ -192,6 +192,11 @@ Resources:
                   - 'execute-api:ManageConnections'
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:execute-api:*:*:*/@connections/*'
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:*'
+                Resource:
+                  - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/conversationhistory
       Path: /
       RoleName: !Join 
         - '-'
@@ -324,6 +329,23 @@ Resources:
       - SdefaultWebsocketsRoute
     Properties:
       ApiId: !Ref WebsocketsApi
+
+  ConversationTable:
+        Type: AWS::DynamoDB::Table
+        Properties:
+          TableName: conversationhistory
+          AttributeDefinitions:
+            - AttributeName: id
+              AttributeType: S
+          BillingMode: PAY_PER_REQUEST
+          KeySchema:
+            - AttributeName: id
+              KeyType: HASH
+          SSESpecification:
+            SSEEnabled: true
+          TimeToLiveSpecification:
+            AttributeName: ttl
+            Enabled: true
 
 Outputs:
   CognitoUserPoolID:
