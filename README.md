@@ -11,7 +11,7 @@ Before creating the insfrastructure via the Cloud Formation template, build the 
 Lambda code and place it in S3 for the Lambda deployment by following the steps below
 
 ### Create the bucket to hold the built Lambda code
-First we create an S3 bucket to hold the deployable Lambda code (remember S3 bucket names are globally unique). To create this bucket, run the following command, where `BE_DEPLOYMENT_BUCKET` is a globally unigue name for the bucket.
+First we create an S3 bucket to hold the deployable Lambda code (remember S3 bucket names are globally unique). To create this bucket, run the following command, where `BE_DEPLOYMENT_BUCKET` is a globally unique name for the bucket.
 
 ```
 env BE_DEPLOYMENT_BUCKET=<bucket_name> ./backend/createDeploymentBucket.sh

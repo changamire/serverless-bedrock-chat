@@ -4,6 +4,7 @@
     "devDependencies": {
         "@aws-crypto/sha256-js": "^5.2.0",
         "@aws-sdk/client-apigatewaymanagementapi": "^3.481.0",
+        "@aws-sdk/client-dynamodb": "^3.490.0",
         "@aws-sdk/credential-provider-node": "^3.481.0",
         "@aws-sdk/types": "^3.468.0",
         "@babel/core": "^7.23.6",
@@ -22,6 +23,7 @@
         "webpack-node-externals": "^3.0.0"
     },
     "dependencies": {
+        "@langchain/community": "^0.0.17",
         "jsonwebtoken": "^9.0.2",
         "jwks-rsa": "^3.1.0",
         "langchain": "^0.0.212"

@@ -1,6 +1,9 @@
 import { Handler } from 'aws-lambda';
 import { Bedrock } from 'langchain/llms/bedrock';
 import { BaseCallbackHandler } from 'langchain/callbacks';
+import { BufferMemory } from 'langchain/memory';
+import { ConversationChain } from 'langchain/chains';
+import { DynamoDBChatMessageHistory } from '@langchain/community/stores/message/dynamodb';
 import { decode, verify } from 'jsonwebtoken';
 import { promisify, TextEncoder } from 'util';
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
@@ -84,6 +87,14 @@ export const handler: Handler = async (event: any, context: any) => {
   connectionId = event.requestContext.connectionId;
   const routeKey = event.requestContext.routeKey;
 
+  const memory = new BufferMemory({
+    chatHistory: new DynamoDBChatMessageHistory({
+      tableName: `conversationhistory`,
+      partitionKey: 'id',
+      sessionId: connectionId,
+    }),
+  });
+
   switch (routeKey) {
     case '$connect': {
       console.log('$connect');
@@ -147,7 +158,8 @@ export const handler: Handler = async (event: any, context: any) => {
     modelKwargs: { max_tokens_to_sample: 4000, temperature: 0.1 },
   });
 
-  const res = await model.invoke(`\n\nHuman: ${prompt} \n\nAssistant:`);
+  const chain = new ConversationChain({ llm: model, memory });
+  const res = await chain.predict({input: `\n\nHuman: ${prompt} \n\nAssistant:`});
   console.log(res);
 
   return {
