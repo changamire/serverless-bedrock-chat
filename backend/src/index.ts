@@ -1,6 +1,6 @@
 import { Handler } from 'aws-lambda';
-import { Bedrock } from 'langchain/llms/bedrock';
-import { BaseCallbackHandler } from 'langchain/callbacks';
+import { Bedrock } from '@langchain/community/llms/bedrock';
+import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { BufferMemory } from 'langchain/memory';
 import { ConversationChain } from 'langchain/chains';
 import { DynamoDBChatMessageHistory } from '@langchain/community/stores/message/dynamodb';

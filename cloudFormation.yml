@@ -217,6 +217,7 @@ Resources:
       Timeout: 600
       Environment:
         Variables:
+          LANGCHAIN_CALLBACKS_BACKGROUD: true
           APIGW_ARN: !Sub >-
             arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketsApi}/dev
           JWKS_URI: !Sub >-
